@@ -1,1 +1,24 @@
-{\n  "name": "dhan-mcp",\n  "version": "1.0.0",\n  "description": "A Model Context Protocol (MCP) server for Dhan with placeholder REST APIs",\n  "main": "src/server.js",\n  "scripts": {\n    "start": "node src/server.js",\n    "dev": "nodemon src/server.js",\n    "test": "echo \"Error: no test specified\" && exit 1"\n  },\n  "keywords": [\n    "mcp",\n    "dhan",\n    "server",\n    "api"\n  ],\n  "author": "ashish01987",\n  "license": "MIT",\n  "dependencies": {\n    "express": "^4.18.2",\n    "cors": "^2.8.5",\n    "dotenv": "^16.0.3"\n  },\n  "devDependencies": {\n    "nodemon": "^2.0.20"\n  }\n}
+{
+  "name": "dhan-mcp",
+  "version": "1.1.0",
+  "description": "Model Context Protocol (MCP) server for Dhan REST APIs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "lint:check": "node --check src/server.js src/config.js src/dhan/client.js src/mcp/tools.js",
+    "test": "npm run lint:check"
+  },
+  "keywords": [
+    "mcp",
+    "dhan",
+    "server",
+    "trading"
+  ],
+  "author": "ashish01987",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
