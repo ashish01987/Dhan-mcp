@@ -90,13 +90,7 @@ class DhanClient {
   getOrderById(orderId) {
     return this.request('GET', `/orders/${orderId}`);
   }
-
-
-  getHistoricalCharts(chartPayload) {
-    return this.request('POST', '/charts/historical', chartPayload);
-  }
 }
-
 
 module.exports = {
   DhanClient,

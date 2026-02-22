@@ -12,32 +12,6 @@ function assertEnum(value, allowed, fieldName) {
   }
 }
 
-
-function assertBoolean(value, fieldName) {
-  if (typeof value !== 'boolean') {
-    throw new Error(`${fieldName} must be a boolean`);
-  }
-}
-
-function assertDate(value, fieldName) {
-  assertString(value, fieldName);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`${fieldName} must be in YYYY-MM-DD format`);
-  }
-}
-
-function validateHistoricalChart(params) {
-  assertString(params.security_id, 'security_id');
-  assertString(params.exchange_segment, 'exchange_segment');
-  assertEnum(params.instrument, ['EQUITY', 'FUTIDX', 'FUTCOM', 'FUTCUR', 'OPTIDX', 'OPTCUR', 'OPTFUT', 'OPTSTK', 'INDEX'], 'instrument');
-  assertEnum(params.expiry_code, [0, 1, 2, 3], 'expiry_code');
-  assertDate(params.from_date, 'from_date');
-  assertDate(params.to_date, 'to_date');
-  if (params.oi !== undefined) {
-    assertBoolean(params.oi, 'oi');
-  }
-}
-
 function assertPositiveInt(value, fieldName, maxValue) {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`${fieldName} must be a positive integer`);
@@ -87,30 +61,6 @@ function buildTools(dhanClient) {
       description: 'Fetch demat holdings.',
       inputSchema: { type: 'object', properties: {} },
       execute: async () => ({ ok: true, holdings: await dhanClient.getHoldings() })
-    },
-    get_historical_charts: {
-      description: 'Fetch historical candle chart data from Dhan historical charts API.',
-      inputSchema: {
-        type: 'object',
-        required: ['security_id', 'exchange_segment', 'instrument', 'expiry_code', 'from_date', 'to_date'],
-        properties: {
-          security_id: { type: 'string' },
-          exchange_segment: { type: 'string' },
-          instrument: {
-            type: 'string',
-            enum: ['EQUITY', 'FUTIDX', 'FUTCOM', 'FUTCUR', 'OPTIDX', 'OPTCUR', 'OPTFUT', 'OPTSTK', 'INDEX']
-          },
-          expiry_code: { type: 'integer', enum: [0, 1, 2, 3] },
-          from_date: { type: 'string', description: 'YYYY-MM-DD' },
-          to_date: { type: 'string', description: 'YYYY-MM-DD' },
-          oi: { type: 'boolean' }
-        }
-      },
-      execute: async (params = {}) => {
-        validateHistoricalChart(params);
-        const charts = await dhanClient.getHistoricalCharts(params);
-        return { ok: true, charts };
-      }
     },
     get_order_by_id: {
       description: 'Fetch a specific order by order_id.',
