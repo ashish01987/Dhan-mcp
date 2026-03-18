@@ -1,6 +1,87 @@
 # Dhan MCP Server
 
-A working MCP server that wraps core Dhan REST APIs as MCP tools.
+A working MCP server that wraps core Dhan REST APIs as MCP tools, with an advanced **Multi-Agent Workflow** for automated intraday Nifty option trading.
+
+## ✨ Features
+
+### 🔧 MCP Server (Core)
+- Exposes Dhan trading APIs as MCP tools
+- Read-only tools: `get_profile`, `get_funds`, `get_positions`, `get_holdings`, `get_order_by_id`
+- Trading tools: `place_order`, `cancel_order` (opt-in, disabled by default)
+- Safe defaults with comprehensive input validation
+
+### 🤖 Multi-Agent Trading Workflow (New!)
+**Automated Intraday Nifty Option Trading System**
+
+- **6 Specialized Agents**: Market Analyzer, Signal Generator, Risk Manager, Order Executor, Position Monitor, Supervisor
+- **Event-Driven Architecture**: Real-time agent coordination via event bus
+- **Multiple Trading Strategies**:
+  - Short Straddle (high volatility)
+  - Iron Condor (range-bound)
+  - Bull/Bear Spreads (directional)
+- **Advanced Risk Management**:
+  - Position limits, daily loss limits, circuit breakers
+  - Automatic stop-loss and profit targets
+  - Time-based exits (square-off at 3:20 PM)
+- **Paper Trading Mode**: Test strategies without real money
+- **Real-time Monitoring**: Live P&L tracking and alerts
+
+📖 **Complete Documentation**: See [MULTI_AGENT_WORKFLOW.md](./MULTI_AGENT_WORKFLOW.md)
+
+## 🚀 Quick Start
+
+### MCP Server Only
+
+```bash
+npm install
+
+# Set credentials
+export DHAN_ACCESS_TOKEN=your_access_token
+export DHAN_CLIENT_ID=your_client_id
+
+# Start server
+npm start
+```
+
+### Multi-Agent Trading Workflow
+
+```bash
+# Configure credentials
+export DHAN_ACCESS_TOKEN=your_token
+export DHAN_CLIENT_ID=your_client_id
+export ENABLE_TRADING_TOOLS=true
+
+# Paper trading (recommended for testing)
+export ENABLE_TRADING=false
+npm run workflow
+
+# Live trading (use with caution!)
+export ENABLE_TRADING=true
+npm run workflow
+```
+
+**Expected Output:**
+```
+============================================================
+🏦 Dhan Multi-Agent Trading Workflow
+    Intraday Nifty Option Trading System
+============================================================
+
+✅ Multi-Agent Workflow is now running!
+
+📋 Configuration:
+   - Trading Enabled: false
+   - Initial Capital: ₹100000
+   - Max Positions: 3
+   - Profit Target: 50%
+
+📊 Agents Status:
+   - marketAnalyzer: ✅ Active
+   - signalGenerator: ✅ Active
+   - riskManager: ✅ Active
+   - orderExecutor: ✅ Active
+   - positionMonitor: ✅ Active
+```
 
 ## What this server exposes
 

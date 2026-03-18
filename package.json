@@ -1,19 +1,26 @@
 {
   "name": "dhan-mcp",
-  "version": "1.1.0",
-  "description": "Model Context Protocol (MCP) server for Dhan REST APIs",
+  "version": "1.2.0",
+  "description": "Model Context Protocol (MCP) server for Dhan REST APIs with Multi-Agent Trading Workflow",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "lint:check": "node --check src/server.js src/config.js src/dhan/client.js src/mcp/tools.js",
+    "workflow": "node src/multi-agent-workflow.js",
+    "workflow:dev": "nodemon src/multi-agent-workflow.js",
+    "lint:check": "node --check src/**/*.js",
     "test": "npm run lint:check"
   },
   "keywords": [
     "mcp",
     "dhan",
     "server",
-    "trading"
+    "trading",
+    "multi-agent",
+    "workflow",
+    "nifty",
+    "options",
+    "intraday"
   ],
   "author": "ashish01987",
   "license": "MIT",
