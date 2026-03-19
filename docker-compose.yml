@@ -1,0 +1,11 @@
+services:
+  dhan-mcp:
+    build: .
+    image: dhan-mcp:latest
+    container_name: dhan-mcp-server
+    restart: unless-stopped
+    environment:
+      - DHAN_CLIENT_ID=${DHAN_CLIENT_ID}
+      - DHAN_ACCESS_TOKEN=${DHAN_ACCESS_TOKEN}
+    stdin_open: true   # MCP uses stdio transport
+    tty: false
