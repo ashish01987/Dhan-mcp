@@ -6,7 +6,7 @@ import fetch from "node-fetch";
 const CLIENT_ID    = process.env.DHAN_CLIENT_ID    || "YOUR_CLIENT_ID";
 const ACCESS_TOKEN = process.env.DHAN_ACCESS_TOKEN || "YOUR_ACCESS_TOKEN";
 const BASE        = "https://api.dhan.co/v2";
-const H = { "Content-Type": "application/json", "access-token": ACCESS_TOKEN };
+const H = { "Content-Type": "application/json", "access-token": ACCESS_TOKEN, "client-id": CLIENT_ID };
 
 async function GET(p)      { const r = await fetch(BASE+p,{headers:H}); const d=await r.json(); if(!r.ok) throw new Error(JSON.stringify(d)); return d; }
 async function POST(p,b)   { const r = await fetch(BASE+p,{method:"POST",  headers:H,body:JSON.stringify(b)}); const d=await r.json(); if(!r.ok) throw new Error(JSON.stringify(d)); return d; }
@@ -190,7 +190,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     case "get_order_by_id":   r = await GET(`/orders/${a.order_id}`); break;
     case "cancel_order":      r = await DEL(`/orders/${a.order_id}`); break;
     case "get_quote":         r = await POST("/marketfeed/ltp",  a.securities); break;
-    case "get_market_depth":  r = await POST("/marketfeed/full", a.securities); break;
+    case "get_market_depth":  r = await POST("/marketfeed/quote", a.securities); break;
     case "get_ohlc":          r = await POST("/marketfeed/ohlc", a.securities); break;
     case "get_trade_history": r = await GET(`/trades/${a.from_date}/${a.to_date}/${a.page??0}`); break;
     case "place_order":
