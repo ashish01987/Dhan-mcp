@@ -1,178 +1,211 @@
 # Dhan MCP Server
 
-A working MCP server that wraps core Dhan REST APIs as MCP tools.
+A **Model Context Protocol (MCP) server** for the [Dhan trading API](https://dhanhq.co/docs/v2/), enabling Claude (and any MCP client) to execute trades, fetch market data, manage orders and analyse your portfolio through natural language.
 
-## What this server exposes
+---
 
-### Read-only tools
-This repository is intended to host an MCP server that wraps Dhan REST APIs and exposes them as MCP tools for an LLM client.
+## Features — 36 tools across 9 categories
 
-## How to build an MCP server from your Dhan REST APIs
+| Category | Tools |
+|---|---|
+| **Core** | Fund limits, holdings, positions, orders (place/cancel/list), quotes, market depth, OHLC |
+| **Candle Data** | Intraday (1/5/15/25/60 min) and daily/weekly/monthly historical OHLCV |
+| **Super Orders** | Entry + target + stop-loss + trailing stop in a single call |
+| **Forever Orders** | GTT with SINGLE and OCO (one-cancels-other) support |
+| **Conditional Triggers** | Auto-place orders when SMA/EMA/RSI/price conditions are met |
+| **Trader's Control** | Kill switch, P&L-based auto-exit |
+| **Margin Calculator** | Pre-trade margin, brokerage & leverage check (single + basket) |
+| **Ledger** | Full account debit/credit statement |
+| **Option Chain** | Full CE/PE chain with OI, IV, Greeks + expiry list |
 
-### 1) Decide what should be exposed as MCP tools
-Map each high-value Dhan REST operation to a tool, for example:
+---
 
-- `get_profile`
-- `get_funds`
-- `get_positions`
-- `get_holdings`
-- `get_order_by_id`
+## Prerequisites
 
-### Trading tools (disabled by default)
-- `place_order`
-- `cancel_order`
+- [Node.js](https://nodejs.org/) v18 or higher
+- A [Dhan](https://dhan.co) trading account with API access
+- Your **Client ID** and **Access Token** from the Dhan developer portal
 
-To enable trading tools explicitly:
+> **Super Orders, Forever Orders and Conditional Triggers** require your server's IP to be whitelisted in the Dhan portal under *Settings → API → Static IP*.
+
+---
+
+## Installation
 
 ```bash
-export ENABLE_TRADING_TOOLS=true
-```
-
-## Setup
-
-```bash
+git clone https://github.com/YOUR_USERNAME/dhan-mcp.git
+cd dhan-mcp
 npm install
 ```
 
-Create environment variables (for example in `.env`):
+### Set credentials
 
-```env
-DHAN_ACCESS_TOKEN=your_access_token
-DHAN_CLIENT_ID=your_client_id
-DHAN_BASE_URL=https://api.dhan.co/v2
-DHAN_TIMEOUT_MS=15000
-ENABLE_TRADING_TOOLS=false
-MAX_ORDER_QUANTITY=10000
-```
-
-## Run as MCP stdio server
+Copy the example env file and fill in your details:
 
 ```bash
-npm start
+cp .env.example .env
 ```
 
-This process is intended to be launched by an MCP-compatible host/client.
+Edit `.env`:
 
-## Architecture
-
-```text
-src/
-  server.js         # MCP stdio entrypoint
-  config.js         # environment and runtime config
-  dhan/
-    client.js       # Dhan REST wrapper + normalized errors
-  mcp/
-    tools.js        # MCP tool declarations + input validation
+```
+DHAN_CLIENT_ID=your_client_id_here
+DHAN_ACCESS_TOKEN=your_access_token_here
 ```
 
-## Safety defaults included
-- Trading tools are opt-in via `ENABLE_TRADING_TOOLS=true`.
-- `place_order` validates payload shape and enforces `MAX_ORDER_QUANTITY`.
-- Timeouts are applied on all Dhan REST calls.
+---
 
-## Notes
-- Tool I/O is intentionally JSON-structured for LLM friendliness.
-- For production, add retries/backoff, audit logs, and idempotency keys for order placement.
-- `place_order`
-- `cancel_order`
-- `get_order_status`
+## Usage with Claude Desktop
 
-A good MCP tool is:
-- focused (one clear action)
-- validated (strict input schema)
-- safe (sensible defaults, guardrails for trading actions)
+Add this to your `claude_desktop_config.json`:
 
-### 2) Keep Dhan authentication and signatures in one API client
-Create a thin `DhanClient` that handles:
-- base URL
-- API key/token headers
-- request retries / timeout
-- error normalization
-
-This keeps tool handlers clean.
-
-### 3) Expose REST endpoints as MCP tools
-Each MCP tool should:
-1. validate inputs
-2. call `DhanClient`
-3. return clean JSON for LLM consumption
-
-Example tool mappings:
-- MCP `get_positions` -> `GET /positions`
-- MCP `place_order` -> `POST /orders`
-- MCP `cancel_order` -> `DELETE /orders/{id}`
-
-### 4) Add strict input schemas
-For actions like `place_order`, enforce:
-- `exchange` enum
-- `symbol` pattern
-- `quantity > 0`
-- `order_type` enum
-- optional risk checks (max quantity/notional)
-
-Without schema validation, MCP tools become unsafe quickly.
-
-### 5) Return LLM-friendly responses
-Prefer structured responses over raw REST payloads. Example:
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
-  "ok": true,
-  "order_id": "12345",
-  "status": "submitted",
-  "message": "Order placed successfully"
+  "mcpServers": {
+    "dhan": {
+      "command": "node",
+      "args": ["C:/path/to/dhan-mcp/index.js"],
+      "env": {
+        "DHAN_CLIENT_ID": "your_client_id",
+        "DHAN_ACCESS_TOKEN": "your_access_token"
+      }
+    }
+  }
 }
 ```
 
-Include both a machine-friendly key set and short human-readable `message`.
+Restart Claude Desktop — the Dhan tools will appear automatically.
 
-### 6) Add essential operational safety
-For production-like use, add:
-- per-tool rate limiting
-- request id + audit logs
-- idempotency keys for order placement
-- environment switch (`paper` vs `live`)
-- explicit confirmation workflow for irreversible actions
+---
 
-### 7) Suggested project layout
+## Example prompts
 
-```text
-src/
-  server.js
-  mcp/
-    tools.js
-    schemas.js
-  dhan/
-    client.js
-    endpoints.js
-  config.js
+```
+Show my fund limits
+What are my current holdings?
+Get daily candles for security 1333 (Reliance) from 2025-01-01 to 2025-03-01
+Buy 10 shares of security 1333 at market price as CNC
+Place a super order: buy 5 shares at 1200, target 1300, stop-loss 1150, trailing jump 10
+Create a forever OCO order: buy at 1200 trigger 1199, target 1300 trigger 1299
+Set auto-exit if I make ₹5000 profit or lose ₹2000 today
+Activate kill switch
+How much margin do I need to buy 50 shares of security 1333 at 1200?
+Show my ledger for last month
+Get NIFTY option chain for expiry 2025-03-27
 ```
 
-### 8) Minimal implementation flow
-1. Start with read-only tools (`get_profile`, `get_positions`).
-2. Add write tools (`place_order`, `cancel_order`) with stronger validation.
-3. Add tests with mocked Dhan responses.
-4. Integrate with your MCP client (Claude Desktop/Cursor/custom host).
+---
 
-## Quick pseudo-code (Node.js)
+## Tool reference
 
-```js
-// tool handler pseudo-code
-async function placeOrderTool(input) {
-  validatePlaceOrder(input);
-  const result = await dhanClient.placeOrder(input);
+### Core trading
+| Tool | Description |
+|---|---|
+| `get_fund_limits` | Available balance, SOD limit, withdrawable balance |
+| `get_holdings` | All demat equity holdings |
+| `get_positions` | Open intraday and short-term positions |
+| `get_order_list` | All orders placed today |
+| `get_order_by_id` | Details of a specific order |
+| `place_order` | Place LIMIT/MARKET/SL orders |
+| `cancel_order` | Cancel a pending order |
+| `get_trade_history` | Historical trades between two dates |
+| `get_quote` | Live LTP for one or more instruments |
+| `get_market_depth` | Full bid/ask order book |
+| `get_ohlc` | OHLC snapshot |
 
-  return {
-    ok: true,
-    order_id: result.orderId,
-    status: result.status,
-    message: 'Order placed successfully'
-  };
-}
-```
+### Candle data
+| Tool | Description |
+|---|---|
+| `get_intraday_candles` | 1/5/15/25/60-minute OHLCV bars |
+| `get_daily_candles` | Daily / weekly / monthly historical candles |
 
-## Practical next step
-If you share your exact Dhan API list (paths + request/response examples), you can generate a concrete MCP `tools` contract and implementation skeleton in one pass.
+### Super Orders
+| Tool | Description |
+|---|---|
+| `place_super_order` | Entry + target + SL + trailing stop in one call |
+| `modify_super_order` | Modify ENTRY_LEG / TARGET_LEG / STOP_LOSS_LEG |
+| `cancel_super_order` | Cancel a specific leg or entire super order |
+| `get_super_orders` | List all super orders for today |
+
+### Forever Orders (GTT)
+| Tool | Description |
+|---|---|
+| `create_forever_order` | SINGLE forever order or OCO pair |
+| `modify_forever_order` | Update price, qty, trigger, validity |
+| `cancel_forever_order` | Cancel by order ID |
+| `get_forever_orders` | List all active forever orders |
+
+### Conditional Triggers
+| Tool | Description |
+|---|---|
+| `create_conditional_trigger` | Trigger orders on price/indicator conditions (SMA, EMA, RSI…) |
+| `get_all_triggers` | List all active triggers |
+| `delete_trigger` | Remove a trigger by alert ID |
+
+### Trader's Control
+| Tool | Description |
+|---|---|
+| `set_kill_switch` | ACTIVATE or DEACTIVATE trading for the day |
+| `get_kill_switch` | Check kill switch status |
+| `set_pnl_exit` | Auto-exit all positions at profit/loss threshold |
+| `get_pnl_exit` | View current P&L exit configuration |
+| `stop_pnl_exit` | Disable active P&L exit rule |
+
+### Margin & Funds
+| Tool | Description |
+|---|---|
+| `calculate_margin` | Margin, brokerage & leverage for a single order |
+| `calculate_margin_multi` | Margin for a basket of orders |
+| `get_ledger` | Full account debit/credit ledger |
+
+### Option Chain
+| Tool | Description |
+|---|---|
+| `get_option_chain` | Full CE/PE chain with OI, IV, Greeks |
+| `get_expiry_dates` | Available expiry dates for an underlying |
+
+### P&L Analysis (computed)
+| Tool | Description |
+|---|---|
+| `get_pnl_summary` | Holding + position P&L breakdown |
+| `get_trade_pnl` | Realized P&L from trade history |
+
+---
+
+## Exchange segments
+
+| Value | Market |
+|---|---|
+| `NSE_EQ` | NSE Equities |
+| `BSE_EQ` | BSE Equities |
+| `NSE_FNO` | NSE Futures & Options |
+| `BSE_FNO` | BSE Futures & Options |
+| `MCX_COMM` | MCX Commodities |
+| `IDX_I` | Indices |
+
+---
+
+## Rate limits (Dhan API)
+
+| Type | Per second | Per day |
+|---|---|---|
+| Order APIs | 10 | 7,000 |
+| Data APIs | 5 | 100,000 |
+| Quote APIs | 1 | Unlimited |
+
+---
+
+## Security
+
+- **Never commit your `.env` file** — it is in `.gitignore`
+- Credentials are loaded only from environment variables (`DHAN_CLIENT_ID`, `DHAN_ACCESS_TOKEN`)
+- The fallback values in `index.js` are placeholder strings, not real credentials
+
+---
 
 ## License
+
 MIT
