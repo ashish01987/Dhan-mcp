@@ -22,7 +22,6 @@ A **Model Context Protocol (MCP) server** for the [Dhan trading API](https://dha
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) v18 or higher
 - A [Dhan](https://dhan.co) trading account with API access
 - Your **Client ID** and **Access Token** from the Dhan developer portal
 
@@ -30,44 +29,53 @@ A **Model Context Protocol (MCP) server** for the [Dhan trading API](https://dha
 
 ---
 
-## Installation
+## Quick start — Docker (recommended)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/dhan-mcp.git
-cd dhan-mcp
-npm install
+git clone https://github.com/ashish01987/Dhan-mcp.git
+cd Dhan-mcp
+cp .env.example .env          # fill in your credentials
+docker compose up --build -d
 ```
 
-### Set credentials
+### Claude Desktop config (Docker)
 
-Copy the example env file and fill in your details:
-
-```bash
-cp .env.example .env
+```json
+{
+  "mcpServers": {
+    "dhan": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i",
+        "-e", "DHAN_CLIENT_ID=your_client_id",
+        "-e", "DHAN_ACCESS_TOKEN=your_access_token",
+        "dhan-mcp:latest"
+      ]
+    }
+  }
+}
 ```
 
-Edit `.env`:
-
-```
-DHAN_CLIENT_ID=your_client_id_here
-DHAN_ACCESS_TOKEN=your_access_token_here
-```
+> Or build the image once and reference it by name. Credentials are **never** baked into the image — they are always passed at runtime via `-e`.
 
 ---
 
-## Usage with Claude Desktop
+## Quick start — Node.js (without Docker)
 
-Add this to your `claude_desktop_config.json`:
+```bash
+git clone https://github.com/ashish01987/Dhan-mcp.git
+cd Dhan-mcp
+npm install
+cp .env.example .env          # fill in your credentials
+```
 
-**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+### Claude Desktop config (Node.js)
 
 ```json
 {
   "mcpServers": {
     "dhan": {
       "command": "node",
-      "args": ["C:/path/to/dhan-mcp/index.js"],
+      "args": ["C:/path/to/Dhan-mcp/index.js"],
       "env": {
         "DHAN_CLIENT_ID": "your_client_id",
         "DHAN_ACCESS_TOKEN": "your_access_token"
@@ -77,7 +85,29 @@ Add this to your `claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop — the Dhan tools will appear automatically.
+---
+
+## Docker reference
+
+```bash
+# Build image
+docker build -t dhan-mcp .
+
+# Run once (interactive, stdio)
+docker run --rm -i \
+  -e DHAN_CLIENT_ID=your_id \
+  -e DHAN_ACCESS_TOKEN=your_token \
+  dhan-mcp
+
+# Run with docker compose (reads from .env automatically)
+docker compose up --build
+
+# Stop
+docker compose down
+
+# Rebuild after code changes
+docker compose up --build --force-recreate
+```
 
 ---
 
@@ -92,7 +122,7 @@ Place a super order: buy 5 shares at 1200, target 1300, stop-loss 1150, trailing
 Create a forever OCO order: buy at 1200 trigger 1199, target 1300 trigger 1299
 Set auto-exit if I make ₹5000 profit or lose ₹2000 today
 Activate kill switch
-How much margin do I need to buy 50 shares of security 1333 at 1200?
+How much margin do I need to buy 50 shares at 1200?
 Show my ledger for last month
 Get NIFTY option chain for expiry 2025-03-27
 ```
@@ -188,6 +218,15 @@ Get NIFTY option chain for expiry 2025-03-27
 
 ---
 
+## Security
+
+- **Never commit your `.env` file** — it is listed in `.gitignore` and `.dockerignore`
+- Credentials are always passed via environment variables — they are **never** baked into the Docker image
+- The Docker image runs as a non-root user (`dhan`) for least-privilege security
+- Fallback values in `index.js` are placeholder strings, not real credentials
+
+---
+
 ## Rate limits (Dhan API)
 
 | Type | Per second | Per day |
@@ -195,14 +234,6 @@ Get NIFTY option chain for expiry 2025-03-27
 | Order APIs | 10 | 7,000 |
 | Data APIs | 5 | 100,000 |
 | Quote APIs | 1 | Unlimited |
-
----
-
-## Security
-
-- **Never commit your `.env` file** — it is in `.gitignore`
-- Credentials are loaded only from environment variables (`DHAN_CLIENT_ID`, `DHAN_ACCESS_TOKEN`)
-- The fallback values in `index.js` are placeholder strings, not real credentials
 
 ---
 
