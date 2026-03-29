@@ -1,28 +1,29 @@
-# ── Stage 1: deps ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
+# ── Python MCP Server for Dhan ────────────────────────────────────────────────
+FROM python:3.11-slim
 
-# ── Stage 2: runtime ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS runtime
 WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application files
+COPY server.py .
 
 # Non-root user for security
-RUN addgroup -S dhan && adduser -S dhan -G dhan
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY package.json ./
-COPY index.js ./
-
-RUN chown -R dhan:dhan /app
+RUN useradd -m -u 1000 dhan && chown -R dhan:dhan /app
 USER dhan
 
-# NOTE: Do NOT set DHAN_CLIENT_ID or DHAN_ACCESS_TOKEN here.
-# Always pass credentials at runtime via -e flags or docker compose env_file.
-# Example: docker run --rm -i -e DHAN_CLIENT_ID=xxx -e DHAN_ACCESS_TOKEN=yyy dhan-mcp
+ENV MCP_TRANSPORT=http
+ENV MCP_PORT=3005
+EXPOSE 3005
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD node -e "process.exit(0)"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3005/health || exit 1
 
-CMD ["node", "index.js"]
+CMD ["python", "server.py"]
