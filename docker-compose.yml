@@ -1,26 +1,76 @@
+version: '3.8'
+
 services:
-  dhan-mcp:
-    build: .
-    image: dhan-mcp:latest
-    container_name: dhan-mcp-server
+  # =========================================================================
+  # HTTP SERVER - Dhan Trading API Wrapper
+  # Production: Single reliable service with health checks and monitoring
+  # =========================================================================
+  http-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.http
+    image: ashis/dhan-http-server:latest
+    container_name: dhan-http-server
     restart: unless-stopped
+    pull_policy: always
+
+    # Ports
     ports:
-      - "${MCP_PORT:-3005}:3005"
+      - "${HTTP_PORT:-3005}:3005"
+
+    # Environment variables
     environment:
-      # OAuth flow (recommended)
+      # Server Port
+      - MCP_PORT=3005
+
+      # OAuth Credentials (recommended - no static tokens)
       - DHAN_CLIENT_ID=${DHAN_CLIENT_ID}
       - DHAN_APP_ID=${DHAN_APP_ID}
       - DHAN_APP_SECRET=${DHAN_APP_SECRET}
-      # OR static token (pass via command line or env_file)
-      - DHAN_ACCESS_TOKEN=${DHAN_ACCESS_TOKEN}
-      # Server
-      - MCP_TRANSPORT=${MCP_TRANSPORT:-http}
-      - MCP_PORT=${MCP_PORT:-3005}
+
+      # Logging
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+
+    # Load environment from .env file
     env_file:
       - .env
+
+    # Health check - critical for production
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
-      interval: 30s
+      interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+
+    # Volume for logs
+    volumes:
+      - ./logs:/app/logs
+
+    # Resource limits - prevent runaway processes
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        labels: "service=dhan-http-server"
+
+    # Networks
+    networks:
+      - dhan-network
+
+# Network for service communication
+networks:
+  dhan-network:
+    driver: bridge

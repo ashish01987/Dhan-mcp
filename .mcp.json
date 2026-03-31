@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "dhan-mcp": {
+      "type": "http",
+      "url": "http://localhost:3008"
+    }
+  }
+}

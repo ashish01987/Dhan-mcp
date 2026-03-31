@@ -1,98 +1,252 @@
-# Dhan MCP Server — Python Edition
+# NIFTY 50 Live Feed - OAuth-Integrated MCP Server
 
-A Model Context Protocol (MCP) server for Dhan trading APIs built with the official **dhanhq** Python library.
+A production-ready real-time market data monitoring system for NIFTY 50 using DhanHQ WebSocket API with OAuth authentication.
 
-## Features
+## 🌟 Features
 
-✅ **OAuth Authentication** — Secure user-driven OAuth flow
-✅ **Full Dhan API** — All trading, market data, and portfolio APIs
-✅ **HTTP Transport** — Persistent server mode for Docker
-✅ **Official Library** — Uses `dhanhq` Python package directly
+- **OAuth Authentication** - Secure token-based access (no hardcoded credentials)
+- **Real-Time WebSocket Feed** - Live tick data streaming from DhanHQ
+- **Event Listeners** - Automatic callback-based updates
+- **MCP Server Integration** - Access via HTTP endpoints
+- **Live Dashboard** - Beautiful terminal-based monitoring display
+- **Production Ready** - Proper error handling and reconnection logic
 
-## Setup
+---
 
-### Option A: Docker (Recommended)
+## 🚀 Quick Start (5 minutes)
 
-1. **Create `.env`**:
-   ```bash
-   cp .env.example .env
-   ```
+### 1. Get Your Dhan Credentials
 
-2. **Edit `.env`** with credentials (see below)
+1. Go to https://web.dhan.co
+2. Log in to your account
+3. Navigate to **Settings → API Keys**
+4. Copy three values:
+   - **Client ID** (format: 10xxxxxxxx)
+   - **App ID** (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+   - **App Secret** (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
 
-3. **Start server**:
-   ```bash
-   docker compose up -d
-   ```
-
-4. **Check health**:
-   ```bash
-   curl http://localhost:3005/health
-   ```
-
-### Option B: Local Python
-
-1. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Run server**:
-   ```bash
-   python server.py
-   ```
-
-## OAuth Flow
-
-### Step 1: Start OAuth
-```bash
-curl http://localhost:3005/oauth/login
-```
-
-### Step 2: User Login
-Open the returned `login_url` in browser and authenticate
-
-### Step 3: Token Exchange
-Server automatically exchanges token for access_token at callback
-
-## Available Tools
-
-**Authentication**
-- oauth_start, oauth_exchange_token
-
-**Portfolio**
-- get_fund_limits, get_holdings, get_positions
-
-**Orders**
-- get_order_list, get_order_by_id, place_order, cancel_order, modify_order
-
-**Market Data**
-- get_quote, get_market_depth, get_ohlc
-
-**Historical Data**
-- get_intraday_candles, get_daily_candles, get_trade_history
-
-**Account**
-- get_account_summary
-
-## Configuration
+### 2. Start the HTTP Backend
 
 ```bash
-# Required
-DHAN_CLIENT_ID=your_client_id
+export DHAN_CLIENT_ID=your_client_id_here
+export DHAN_APP_ID=your_app_id_here
+export DHAN_APP_SECRET=your_app_secret_here
 
-# OAuth (Recommended)
-DHAN_APP_ID=your_app_id
-DHAN_APP_SECRET=your_app_secret
-
-# OR Static Token
-DHAN_ACCESS_TOKEN=your_access_token
-
-# Server
-MCP_TRANSPORT=http|stdio
-MCP_PORT=3005
+cd /c/dhan-mcp
+python server.py
 ```
 
-## License
+**Output:**
+```
+✅ Server running on http://0.0.0.0:3005
+📋 Available endpoints:
+   OAuth:      GET  http://localhost:3005/oauth/login
+   OAuth Token: GET  http://localhost:3005/api/oauth/token
+   API:        POST http://localhost:3005/api
+```
 
-MIT
+### 3. Set Your OAuth Token (New Terminal)
+
+Get your access token from: https://web.dhan.co → Settings → API Keys
+
+```bash
+curl -X POST http://localhost:3005/api/oauth/set-token -H "Content-Type: application/json" -d "{\"access_token\":\"3a71454e-7b42-4d82-a157-080c35416971\"}"
+
+```
+
+**Expected Response:**
+```json
+{
+  "status": "ok",
+  "message": "Access token set successfully",
+  "next_step": "WebSocket can now connect via MCP server"
+}
+```
+
+### 4. Start the MCP Server
+
+```bash
+python mcp_server.py
+```
+
+**Output:**
+```
+✅ MCP Server: http://0.0.0.0:3008
+✅ HTTP Backend: http://localhost:3005
+📡 61 tools available
+```
+
+### 5. Start Live Monitoring (New Terminal)
+
+```bash
+python monitor_nifty.py
+```
+
+**Live Output:**
+```
+================================================================================
+                        NIFTY 50 LIVE MONITOR
+================================================================================
+Time                 LTP          Change          Bid          Ask          Vol
+--------------------------------------------------------------------------------
+23:45:32             24850.50     +50.25 (0.21%)   24850.00     24851.00     1,234,567
+23:45:33             24851.25     +0.75 (0.00%)    24850.50     24852.00     1,245,678
+```
+
+---
+
+## 📊 Understanding the Live Monitor
+
+### Display Columns
+
+| Column | Meaning | Example |
+|--------|---------|---------|
+| **Time** | Update timestamp | 23:45:32 |
+| **LTP** | Last Traded Price | 24850.50 |
+| **Change** | Price change from previous tick | +50.25 (0.21%) |
+| **Bid** | Market bid price | 24850.00 |
+| **Ask** | Market ask price | 24851.00 |
+| **Vol** | Trading volume | 1,234,567 |
+
+### Summary Section
+
+Every 10 seconds, you'll see:
+```
+Summary                                   Spread: 1.00
+Open                 24800.00             High                 24875.50
+Low                  24750.00             Close                24850.50
+```
+
+---
+
+## ⚙️ Configuration
+
+### Monitor Duration
+
+```bash
+# Monitor for specific duration (in seconds)
+python monitor_nifty.py 300   # 5 minutes
+python monitor_nifty.py 3600  # 1 hour
+python monitor_nifty.py       # Run until Ctrl+C
+```
+
+### Subscribe to Different Instruments
+
+Edit `monitor_nifty.py` in the `setup_websocket()` method:
+
+```python
+# Subscribe to NIFTY 50 (default)
+{"instruments": [["NSE", "99926000", "Quote"]]}
+
+# Subscribe to Bank NIFTY
+{"instruments": [["NSE", "99926009", "Quote"]]}
+
+# Subscribe to multiple instruments
+{"instruments": [
+    ["NSE", "99926000", "Quote"],  # NIFTY 50
+    ["NSE", "99926009", "Quote"]   # Bank NIFTY
+]}
+```
+
+---
+
+## 🔧 API Endpoints
+
+### Test WebSocket Connection
+
+```bash
+# Connect to DhanHQ via OAuth
+curl -X POST http://localhost:3008/messages \
+  -H "Content-Type: application/json" \
+  -d '{"method": "tools/call", "params": {"name": "ws_connect", "arguments": {}}}'
+
+# Subscribe to NIFTY 50
+curl -X POST http://localhost:3008/messages \
+  -H "Content-Type: application/json" \
+  -d '{"method": "tools/call", "params": {"name": "ws_subscribe", "arguments": {"instruments": [["NSE", "99926000", "Quote"]]}}}'
+
+# Get tick data
+curl -X POST http://localhost:3008/messages \
+  -H "Content-Type: application/json" \
+  -d '{"method": "tools/call", "params": {"name": "ws_get_ticks", "arguments": {}}}'
+
+# Get connection status
+curl -X POST http://localhost:3008/messages \
+  -H "Content-Type: application/json" \
+  -d '{"method": "tools/call", "params": {"name": "ws_status", "arguments": {}}}'
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### "No tick data received yet"
+
+**Causes:** Market closed, token lacks permission, websocket not connected
+
+**Solution:**
+```bash
+# Check WebSocket status
+curl -X POST http://localhost:3008/messages \
+  -H "Content-Type: application/json" \
+  -d '{"method": "tools/call", "params": {"name": "ws_status", "arguments": {}}}'
+```
+
+### "Failed to fetch OAuth token"
+
+**Solution:**
+```bash
+# Set new token
+curl -X POST http://localhost:3005/api/oauth/set-token \
+  -H "Content-Type: application/json" \
+  -d '{"access_token":"FRESH_TOKEN"}'
+```
+
+### "Connection refused on port 3008"
+
+**Solution:**
+```bash
+# Kill existing process and restart
+wmic process where "commandline like '%mcp_server%'" delete
+python mcp_server.py
+```
+
+---
+
+## 📈 System Architecture
+
+```
+Dhan Account (OAuth Provider)
+     ↓ OAuth Token
+HTTP Backend (port 3005)
+     ↓
+MCP Server (port 3008)
+     ↓ WebSocket
+DhanHQ Market Feed
+     ↓ Event Listeners
+Live Monitor Display
+```
+
+---
+
+## 📚 Requirements
+
+- Python 3.8+
+- DhanHQ account with API access
+- OAuth credentials (Client ID, App ID, App Secret)
+
+---
+
+## ✅ Verification Checklist
+
+- [ ] Dhan credentials obtained
+- [ ] HTTP backend running on port 3005
+- [ ] OAuth token set in backend
+- [ ] MCP server running on port 3008
+- [ ] WebSocket connected
+- [ ] Subscribed to NIFTY 50
+- [ ] Live monitor displaying data
+
+---
+
+**Happy Trading! 📈**

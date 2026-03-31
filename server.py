@@ -17,20 +17,25 @@ from dhanhq import DhanLogin, DhanContext, dhanhq, MarketFeed
 # Load environment
 dotenv.load_dotenv()
 
-# Configuration
+# Configuration - OAuth Only
 CLIENT_ID = os.getenv("DHAN_CLIENT_ID", "")
 APP_ID = os.getenv("DHAN_APP_ID", "")
 APP_SECRET = os.getenv("DHAN_APP_SECRET", "")
-ACCESS_TOKEN = os.getenv("DHAN_ACCESS_TOKEN", "")
-PORT = int(os.getenv("MCP_PORT", "3005"))
+HTTP_PORT = int(os.getenv("HTTP_PORT", "3005"))
+PORT = HTTP_PORT  # Alias for compatibility
+
+# OAuth is required - no static tokens
+if not APP_ID or not APP_SECRET:
+    raise ValueError("DHAN_APP_ID and DHAN_APP_SECRET are required for OAuth")
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger("dhan")
 
-# Global state
+# Global state - OAuth only
 dhan_login: Optional[DhanLogin] = None
 dhan_client = None
+access_token: Optional[str] = None  # Set after OAuth token exchange
 current_consent_id: Optional[str] = None
 market_feed: Optional[MarketFeed] = None
 market_subscriptions: Dict[str, list] = {}  # {symbol: [ws1, ws2, ...]}
@@ -42,30 +47,24 @@ market_ticks: Dict[str, dict] = {}  # {symbol: latest_tick}
 # ═══════════════════════════════════════════════════════════════════════════
 
 async def init_oauth():
-    """Initialize OAuth if credentials available"""
+    """Initialize OAuth - Required authentication method"""
     global dhan_login
-    if not APP_ID or not APP_SECRET:
-        logger.info("OAuth: APP_ID/APP_SECRET not configured")
-        return
     try:
         dhan_login = DhanLogin(CLIENT_ID or "")
-        logger.info("OAuth: Ready. Call GET /oauth/login to start")
+        logger.info("✅ OAuth: Ready - Complete OAuth flow to authenticate")
+        logger.info("   1. GET /oauth/login to start")
+        logger.info("   2. Open login URL in browser")
+        logger.info("   3. GET /oauth/callback?token_id=xxx to exchange token")
     except Exception as e:
-        logger.error(f"OAuth init failed: {e}")
+        logger.error(f"❌ OAuth initialization failed: {e}")
+        raise
 
 
 async def init_dhan_client():
-    """Initialize Dhan client with available credentials"""
-    global dhan_client, ACCESS_TOKEN
-    if ACCESS_TOKEN:
-        try:
-            ctx = DhanContext(CLIENT_ID or "", ACCESS_TOKEN)
-            dhan_client = dhanhq(ctx)
-            logger.info("Client: Initialized with access token")
-        except Exception as e:
-            logger.error(f"Client init failed: {e}")
-    else:
-        logger.info("Client: No access token. Use OAuth or provide DHAN_ACCESS_TOKEN")
+    """Dhan client will be initialized after OAuth token exchange"""
+    global dhan_client
+    logger.info("🔐 Client: Waiting for OAuth token exchange...")
+    logger.info("   Complete the OAuth flow at /oauth/login")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -127,15 +126,15 @@ async def on_market_ticks(ticks):
 
 
 async def init_market_feed():
-    """Initialize real-time market feed"""
-    global market_feed, dhan_client, CLIENT_ID, ACCESS_TOKEN
+    """Initialize real-time market feed (after OAuth token acquired)"""
+    global market_feed, dhan_client, CLIENT_ID, access_token
 
-    if not dhan_client or not ACCESS_TOKEN:
-        logger.info("Market Feed: Skipped (no client)")
+    if not dhan_client or not access_token:
+        logger.info("Market Feed: Waiting for OAuth token...")
         return
 
     try:
-        ctx = DhanContext(CLIENT_ID or "", ACCESS_TOKEN)
+        ctx = DhanContext(CLIENT_ID or "", access_token)
 
         # Create market feed (start empty, clients will subscribe)
         market_feed = MarketFeed(
@@ -148,9 +147,9 @@ async def init_market_feed():
             on_ticks=on_market_ticks
         )
 
-        logger.info("Market Feed: Ready for subscriptions")
+        logger.info("✅ Market Feed: Ready for subscriptions")
     except Exception as e:
-        logger.error(f"Market Feed init failed: {e}")
+        logger.error(f"❌ Market Feed init failed: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -202,8 +201,8 @@ async def handle_oauth_login(request):
 
 
 async def handle_oauth_callback(request):
-    """Exchange OAuth token"""
-    global dhan_login, dhan_client, ACCESS_TOKEN
+    """Exchange OAuth token for access"""
+    global dhan_login, dhan_client, access_token
 
     token_id = request.query.get("token_id")
     if not token_id:
@@ -214,31 +213,32 @@ async def handle_oauth_callback(request):
 
         # Extract access token from response
         if isinstance(response, dict):
-            access_token = response.get("accessToken")
+            new_token = response.get("accessToken")
             client_name = response.get("dhanClientName", "User")
         else:
-            access_token = response
+            new_token = response
             client_name = "User"
 
-        if not access_token:
+        if not new_token:
             return web.json_response({"error": "No access token in response"}, status=500)
 
-        ACCESS_TOKEN = access_token
+        # Store token in memory
+        access_token = new_token
 
-        # Initialize client
-        ctx = DhanContext(CLIENT_ID or "", access_token)
+        # Initialize client with token
+        ctx = DhanContext(CLIENT_ID or "", new_token)
         dhan_client = dhanhq(ctx)
 
-        logger.info(f"OAuth: Token exchanged successfully for {client_name}")
+        logger.info(f"✅ OAuth: Authenticated as {client_name}")
         return web.json_response({
             "status": "ok",
-            "message": f"Successfully authenticated as {client_name}",
-            "access_token": access_token[:50] + "...",
-            "expiry": response.get("expiryTime") if isinstance(response, dict) else None,
-            "next_step": f"Add to .env: DHAN_ACCESS_TOKEN={access_token}"
+            "message": f"✅ Successfully authenticated as {client_name}",
+            "client_name": client_name,
+            "token_acquired": True,
+            "next_step": "You can now use all API methods. Start with: GET /api/methods"
         }, dumps=lambda x: json.dumps(x, default=str))
     except Exception as e:
-        logger.error(f"OAuth callback error: {e}")
+        logger.error(f"❌ OAuth callback error: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
 
@@ -544,24 +544,77 @@ async def handle_market_ws(request):
     return ws
 
 
+async def handle_get_token(request):
+    """Get current OAuth access token (for websocket/MCP server)"""
+    global access_token
+
+    if not access_token:
+        return web.json_response({
+            "error": "No access token available - complete OAuth flow first",
+            "steps": [
+                "1. GET /oauth/login to start OAuth",
+                "2. Open login URL in browser",
+                "3. GET /oauth/callback?token_id=xxx to exchange token"
+            ]
+        }, status=401)
+
+    return web.json_response({"access_token": access_token})
+
+
+async def handle_set_token(request):
+    """Set access token directly (for development/testing)"""
+    global access_token, dhan_client
+
+    try:
+        body = await request.json()
+    except:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    token = body.get("access_token")
+    if not token:
+        return web.json_response({"error": "Missing access_token"}, status=400)
+
+    access_token = token
+
+    # Initialize client with token
+    try:
+        ctx = DhanContext(CLIENT_ID or "", token)
+        dhan_client = dhanhq(ctx)
+        logger.info(f"✅ Access token set manually")
+        return web.json_response({
+            "status": "ok",
+            "message": "Access token set successfully",
+            "next_step": "WebSocket can now connect via MCP server"
+        })
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=400)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════
 
 async def main():
-    """Start HTTP server"""
-    logger.info("Starting Dhan Server v4.0.0")
+    """Start HTTP server - OAuth required"""
+    logger.info("🚀 Starting Dhan Server v4.0.0 (OAuth-only)")
+    logger.info("")
 
-    # Initialize
-    await init_oauth()
-    await init_dhan_client()
-    await init_market_feed()
+    # Initialize OAuth
+    try:
+        await init_oauth()
+        await init_dhan_client()
+    except ValueError as e:
+        logger.error(f"❌ Configuration error: {e}")
+        logger.error("Required: DHAN_APP_ID and DHAN_APP_SECRET")
+        return
 
     # Setup HTTP app
     app = web.Application()
     app.router.add_get("/health", handle_health)
     app.router.add_get("/oauth/login", handle_oauth_login)
     app.router.add_get("/oauth/callback", handle_oauth_callback)
+    app.router.add_get("/api/oauth/token", handle_get_token)
+    app.router.add_post("/api/oauth/set-token", handle_set_token)
     app.router.add_get("/api/methods", handle_api_methods)
     app.router.add_post("/api", handle_api)
     app.router.add_get("/market", handle_market_ws)
@@ -572,12 +625,21 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
 
-    logger.info(f"Server running on http://0.0.0.0:{PORT}")
-    logger.info(f"  Health: GET http://localhost:{PORT}/health")
-    logger.info(f"  OAuth: GET http://localhost:{PORT}/oauth/login")
-    logger.info(f"  API Methods: GET http://localhost:{PORT}/api/methods")
-    logger.info(f"  API: POST http://localhost:{PORT}/api")
-    logger.info(f"  Market Feed: WS ws://localhost:{PORT}/market")
+    logger.info(f"✅ Server running on http://0.0.0.0:{PORT}")
+    logger.info("")
+    logger.info("📋 Available endpoints:")
+    logger.info(f"   Health:     GET  http://localhost:{PORT}/health")
+    logger.info(f"   OAuth:      GET  http://localhost:{PORT}/oauth/login")
+    logger.info(f"   OAuth Token:GET  http://localhost:{PORT}/api/oauth/token (for WebSocket)")
+    logger.info(f"   API:        POST http://localhost:{PORT}/api")
+    logger.info(f"   Methods:    GET  http://localhost:{PORT}/api/methods")
+    logger.info(f"   Market:     WS   ws://localhost:{PORT}/market")
+    logger.info("")
+    logger.info("🔐 Authentication: OAuth required")
+    logger.info("   1. Visit: http://localhost:{PORT}/oauth/login")
+    logger.info("   2. Authenticate in browser")
+    logger.info("   3. Complete callback with token_id")
+    logger.info("")
 
     # Keep running
     await asyncio.Event().wait()
