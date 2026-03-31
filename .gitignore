@@ -4,3 +4,6 @@ node_modules/
 _patch.txt
 .env.local
 .env.*.local
+.claude/
+__pycache__/
+*.pyc

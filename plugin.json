@@ -1,0 +1,72 @@
+{
+  "name": "dhan-mcp",
+  "displayName": "Dhan Trading & Portfolio Manager",
+  "version": "1.0.0",
+  "description": "Complete trading and portfolio management connector for Dhan trading platform with technical analysis, risk management, options trading, and backtesting capabilities.",
+  "author": "Trading Analytics",
+  "homepage": "https://dhan.co",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/dhan-mcp"
+  },
+  "license": "MIT",
+  "mcpServers": {
+    "dhan-mcp": {
+      "type": "http",
+      "url": "http://localhost:3008"
+    }
+  },
+  "keywords": [
+    "trading",
+    "portfolio",
+    "technical-analysis",
+    "risk-management",
+    "options",
+    "backtesting",
+    "dhan",
+    "stock-market"
+  ],
+  "capabilities": {
+    "tools": true,
+    "mcp": true
+  },
+  "commands": [
+    {
+      "name": "get-portfolio-summary",
+      "title": "Get Portfolio Summary",
+      "description": "View current portfolio overview and performance metrics",
+      "icon": "📊",
+      "allowedTools": [
+        "mcp__plugin_dhan-mcp_dhan-mcp__get_portfolio_summary",
+        "mcp__plugin_dhan-mcp_dhan-mcp__get_portfolio_pnl"
+      ]
+    },
+    {
+      "name": "place-trade",
+      "title": "Place Trade",
+      "description": "Execute a new trade with risk management",
+      "icon": "📈",
+      "allowedTools": [
+        "mcp__plugin_dhan-mcp_dhan-mcp__place_order",
+        "mcp__plugin_dhan-mcp_dhan-mcp__calculate_position_size",
+        "mcp__plugin_dhan-mcp_dhan-mcp__calculate_risk_reward"
+      ]
+    },
+    {
+      "name": "analyze-technical",
+      "title": "Technical Analysis",
+      "description": "Run comprehensive technical analysis on a security",
+      "icon": "📉",
+      "allowedTools": [
+        "mcp__plugin_dhan-mcp_dhan-mcp__analyze_technical",
+        "mcp__plugin_dhan-mcp_dhan-mcp__get_quote",
+        "mcp__plugin_dhan-mcp_dhan-mcp__get_candles"
+      ]
+    }
+  ],
+  "requiredEnv": [],
+  "documentation": {
+    "setup": "README.md",
+    "authentication": "docs/authentication.md"
+  }
+}
